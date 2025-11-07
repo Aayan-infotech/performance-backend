@@ -98,16 +98,16 @@
 //   }
 // }
 
-
 import lighthouse from "lighthouse";
 import { launch } from "chrome-launcher";
 
 /**
- * Run a full Lighthouse audit and extract max useful SEO + Performance data
- * @param {string} url
- * @returns {Promise<object>}
+ * Run a full Lighthouse audit with device type option
+ * @param {string} url - URL to audit
+ * @param {"mobile"|"desktop"} [device="mobile"] - Device type
+ * @returns {Promise<object>} Lighthouse results
  */
-export async function runLighthouseAudit(url) {
+export async function runLighthouseAudit(url, device = "mobile") {
   const chrome = await launch({
     chromeFlags: [
       "--headless=new",
@@ -118,30 +118,68 @@ export async function runLighthouseAudit(url) {
     ],
   });
 
+  // Define device-specific configuration
+  const isMobile = device === "mobile";
+
+  const config = {
+    extends: "lighthouse:default",
+    settings: {
+      formFactor: device,
+      screenEmulation: isMobile
+        ? {
+            mobile: true,
+            width: 360,
+            height: 640,
+            deviceScaleFactor: 2.625,
+            disabled: false,
+          }
+        : {
+            mobile: false,
+            width: 1350,
+            height: 940,
+            deviceScaleFactor: 1,
+            disabled: false,
+          },
+      throttling: isMobile
+        ? {
+            rttMs: 150,
+            throughputKbps: 1638.4,
+            cpuSlowdownMultiplier: 4,
+            requestLatencyMs: 562.5,
+            downloadThroughputKbps: 1474.560,
+            uploadThroughputKbps: 675,
+          }
+        : {
+            rttMs: 40,
+            throughputKbps: 10240,
+            cpuSlowdownMultiplier: 1,
+            requestLatencyMs: 0,
+            downloadThroughputKbps: 0,
+            uploadThroughputKbps: 0,
+          },
+      onlyCategories: ["performance", "accessibility", "best-practices", "seo", "pwa"],
+    },
+  };
+
   const options = {
     logLevel: "error",
     output: "json",
     port: chrome.port,
-    onlyCategories: ["performance", "accessibility", "best-practices", "seo", "pwa"],
-    maxWaitForFcp: 60000,
-    maxWaitForLoad: 90000,
   };
 
   try {
-    const runnerResult = await lighthouse(url, options);
+    const runnerResult = await lighthouse(url, options, config);
     const report = JSON.parse(runnerResult.report);
 
     const { categories, audits } = report;
-
-    // helper for safely extracting audit values
     const val = (key, field = "displayValue") => audits[key]?.[field] ?? null;
 
     return {
       url,
+      device,
       fetchTime: report.fetchTime,
       userAgent: report.userAgent,
       finalUrl: report.finalUrl,
-
       categories: {
         performance: categories.performance?.score ?? 0,
         accessibility: categories.accessibility?.score ?? 0,
@@ -149,7 +187,6 @@ export async function runLighthouseAudit(url) {
         bestPractices: categories["best-practices"]?.score ?? 0,
         pwa: categories.pwa?.score ?? 0,
       },
-
       performance: {
         firstContentfulPaint: val("first-contentful-paint"),
         speedIndex: val("speed-index"),
@@ -157,66 +194,6 @@ export async function runLighthouseAudit(url) {
         timeToInteractive: val("interactive"),
         totalBlockingTime: val("total-blocking-time"),
         cumulativeLayoutShift: val("cumulative-layout-shift"),
-        serverResponseTime: val("server-response-time"),
-        bootupTime: val("bootup-time"),
-        domSize: val("dom-size"),
-      },
-
-      seo: {
-        metaDescription: val("meta-description", "score"),
-        title: val("document-title", "score"),
-        hreflang: val("hreflang", "score"),
-        canonical: val("canonical", "score"),
-        linkText: val("link-text", "score"),
-        httpStatusCode: audits["http-status-code"]?.numericValue ?? null,
-        robotsTxt: val("robots-txt", "score"),
-        isIndexable: audits["is-crawlable"]?.score ?? null,
-        tapTargets: val("tap-targets", "score"),
-        fontSize: val("font-size", "score"),
-        mobileFriendly: val("uses-responsive-images", "score"),
-        structuredData: val("structured-data", "score"),
-        headingLevels: val("heading-levels", "score"),
-        crawlErrors: audits["crawlable-anchors"]?.details?.items?.length ?? 0,
-      },
-
-      accessibility: {
-        colorContrast: val("color-contrast", "score"),
-        altText: val("image-alt", "score"),
-        ariaRoles: val("aria-allowed-attr", "score"),
-        label: val("label", "score"),
-        tabOrder: val("tabindex", "score"),
-      },
-
-      bestPractices: {
-        usesHttps: val("is-on-https", "score"),
-        validDoctype: val("doctype", "score"),
-        noVulnerableLibraries: val("no-vulnerable-libraries", "score"),
-        externalAnchorsUseRelNoopener: val("external-anchors-use-rel-noopener", "score"),
-        jsLibraries: audits["js-libraries"]?.details?.items || [],
-      },
-
-      pwa: {
-        serviceWorker: val("service-worker", "score"),
-        manifest: val("manifest-short-name-length", "score"),
-        offlineCapability: val("works-offline", "score"),
-      },
-
-      meta: {
-        titleText: audits["document-title"]?.title ?? null,
-        descriptionText: audits["meta-description"]?.description ?? null,
-        viewport: audits["viewport"]?.score ?? null,
-        charset: audits["uses-http2"]?.score ?? null,
-        crawlable: audits["is-crawlable"]?.score ?? null,
-      },
-
-      // Extract keyword hints from title/description/headings if possible
-      keywordHints: {
-        titleWords: audits["document-title"]?.title?.split(/\s+/).slice(0, 10) ?? [],
-        metaWords: audits["meta-description"]?.description?.split(/\s+/).slice(0, 10) ?? [],
-        headingsWords:
-          audits["heading-levels"]?.details?.items
-            ?.flatMap((h) => (h?.snippet || "").split(/\s+/))
-            .slice(0, 10) ?? [],
       },
     };
   } catch (err) {

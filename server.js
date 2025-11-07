@@ -31,20 +31,11 @@ app.use(express.static(path.join(__dirname, "dashboard")));
  * Body: { url: string, keyword?: string, userId?: string }
  */
 app.post("/audit", async (req, res) => {
-  console.log("start")
-  const { url, keyword, userId } = req.body;
+  // console.log("start",req.body)
+  const { url, keyword, userId,device } = req.body;
   if (!url) return res.status(400).json({ error: "URL is required" });
- 
-
-
-
-
-
-
-
-  
   try {
-    const auditResult = await runLighthouseAudit(url);
+    const auditResult = await runLighthouseAudit(url,device);
 
     // Save audit report to DB if userId provided
     let savedReport = null;
@@ -53,7 +44,6 @@ app.post("/audit", async (req, res) => {
     }
 
     return res.json({ ok: true, auditResult, reportId: savedReport?._id });
-  console.log("response send")
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Audit failed", detail: err.toString() });
