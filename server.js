@@ -11,7 +11,7 @@ import { fileURLToPath } from "url";
 
 
 dotenv.config();
-const PORT = process.env.PORT || 3940;
+const PORT = process.env.PORT || 4540;
 await mongoose.connect(process.env.MONGO_URI, {});
 
 const app = express();
