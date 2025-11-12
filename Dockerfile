@@ -1,11 +1,10 @@
 # Dockerfile for node:18-alpine with Chromium for lighthouse/chrome-launcher
 FROM node:18-alpine
 
-# set working dir
 WORKDIR /usr/src/app
 
 # Install Chromium + minimal runtime deps and dumb-init for proper signal handling
-# ttf-dejavu and font-noto give some fonts so headless chrome can render pages
+# and create a /usr/bin/chromium-browser symlink if only /usr/bin/chromium exists.
 RUN apk add --no-cache \
     chromium \
     nss \
@@ -14,10 +13,10 @@ RUN apk add --no-cache \
     ttf-dejavu \
     font-noto \
     dumb-init \
-  && # ensure a consistent binary name: create symlink if needed
-    if [ ! -x "/usr/bin/chromium-browser" ] && [ -x "/usr/bin/chromium" ]; then \
-      ln -s /usr/bin/chromium /usr/bin/chromium-browser; \
-    fi
+  && \
+  if [ ! -x "/usr/bin/chromium-browser" ] && [ -x "/usr/bin/chromium" ]; then \
+    ln -s /usr/bin/chromium /usr/bin/chromium-browser; \
+  fi
 
 # Point chrome-launcher to the binary
 ENV CHROME_PATH=/usr/bin/chromium-browser
