@@ -57,6 +57,7 @@ app.post("/audit", async (req, res) => {
 app.get("/audit/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
+    console.log(userId)
     const report = await AuditReport.find({ userId }).sort({ createdAt: -1 });
     if (!report) return res.status(404).json({ error: "Report not found" });
     return res.json({ ok: true, report });
@@ -65,4 +66,4 @@ app.get("/audit/:userId", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT} with the help of puppeteer`));
